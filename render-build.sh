@@ -1,4 +1,16 @@
 #!/bin/bash
+set -e
 
-# Sikrer korrekt Puppeteer-install på Render
-npm install --omit=dev
+echo "➡️ Starter installation af puppeteer og afhængigheder"
+
+# Brug npm i stedet for yarn for sikkerhed
+npm install
+
+echo "✅ npm install færdig"
+
+# Tving puppeteer til at hente Chromium (hvis nødvendigt)
+npx puppeteer install
+
+echo "✅ Puppeteer + Chromium hentet"
+
+echo "🎉 Klar til deploy"
