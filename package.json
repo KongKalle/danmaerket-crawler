@@ -1,9 +1,10 @@
 {
   "name": "danmaerket-crawler",
   "version": "1.0.0",
+  "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "postinstall": "echo '🧹 Puppeteer Chromium download springes over...'"
   },
   "dependencies": {
     "express": "^4.18.2",

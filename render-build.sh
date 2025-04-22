@@ -1,16 +1,12 @@
 #!/bin/bash
 set -e
 
-echo "➡️ Starter installation af puppeteer og afhængigheder"
+echo "➡️ Starter hurtig installation uden Chromium-download"
 
-# Brug npm i stedet for yarn for sikkerhed
+# Skip download af Chromium
+export PUPPETEER_SKIP_DOWNLOAD=true
+
 npm install
 
-echo "✅ npm install færdig"
-
-# Tving puppeteer til at hente Chromium (hvis nødvendigt)
-npx puppeteer install
-
-echo "✅ Puppeteer + Chromium hentet"
-
+echo "✅ Afhængigheder installeret"
 echo "🎉 Klar til deploy"
