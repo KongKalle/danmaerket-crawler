@@ -61,8 +61,8 @@ function shouldInclude(link) {
     '/produkt/',
     '/produkt-kategori/',
     '/products/',
-    '/collections/'
-    '/kategori/'
+    '/collections/',
+    '/kategori/',
     '/blog/'
   ];
 
