@@ -1,4 +1,4 @@
-"const express = require('express');
+const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const cors = require('cors');
@@ -41,6 +41,7 @@ function isInternalLink(base, link) {
 }
 
 function shouldInclude(link) {
+  // Udeluk produkt-URLs
   return !link.includes('/products/');
 }
 
@@ -81,7 +82,12 @@ app.post('/crawl', async (req, res) => {
     $('a[href]').each((_, el) => {
       const href = $(el).attr('href');
       const normalized = normalizeUrl(currentUrl, href);
-      if (normalized && !visited.has(normalized) && isInternalLink(url, normalized) && shouldInclude(normalized)) {
+      if (
+        normalized &&
+        !visited.has(normalized) &&
+        isInternalLink(url, normalized) &&
+        shouldInclude(normalized)
+      ) {
         toVisit.push(normalized);
       }
     });
@@ -92,4 +98,4 @@ app.post('/crawl', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`✅ Danmærket crawler kører på port ${PORT}`);
-});""
+});
