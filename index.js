@@ -55,8 +55,15 @@ function shouldInclude(link) {
     'refund',
     'return'
   ];
+  const blacklist = [
+    '/products/',
+    '/collections/'
+  ];
   const pathname = new URL(link, 'https://dummy.dk').pathname.toLowerCase();
-  return whitelist.some(word => pathname.includes(word));
+  return (
+    whitelist.some(word => pathname.includes(word)) &&
+    !blacklist.some(pattern => pathname.includes(pattern))
+  );
 }
 
 const extraPolicyPaths = [
