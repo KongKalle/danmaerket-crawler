@@ -15,7 +15,8 @@ async function fetchHtml(url) {
     browser = await puppeteer.launch({
       args: chromium.args,
       defaultViewport: chromium.defaultViewport,
-      executablePath: executablePath || '/usr/bin/chromium-browser',
+      executablePath: executablePath,
+
       headless: chromium.headless,
     });
 
