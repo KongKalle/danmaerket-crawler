@@ -1,11 +1,12 @@
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
 
-const fetcher = puppeteer.createBrowserFetcher();
-const revision = '1069273'; // Stabil revision fra Puppeteer 19.11.1
+console.log('🔧 Install-script: Starter download af Chromium...');
 
-fetcher.download(revision)
+puppeteer
+  .createBrowserFetcher()
+  .download('1069273') // Revision for v19.11.1
   .then(() => {
-    console.log('✅ Chromium installeret (rev. ' + revision + ')');
+    console.log('✅ Chromium installeret (rev. 1069273)');
   })
   .catch(err => {
     console.error('❌ Fejl ved installation af Chromium:', err.message);
