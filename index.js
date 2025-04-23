@@ -62,6 +62,8 @@ function shouldInclude(link) {
     '/produkt-kategori/',
     '/products/',
     '/collections/'
+    '/kategori/'
+    '/blog/'
   ];
 
   const lowerLink = link.toLowerCase();
