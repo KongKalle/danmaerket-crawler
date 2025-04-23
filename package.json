@@ -3,11 +3,11 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "postinstall": "echo \"Chromium download aktiveret...\""
+    "postinstall": "echo \"Chromium klar via systempakker\""
   },
   "dependencies": {
     "express": "^4.18.2",
     "cors": "^2.8.5",
-    "puppeteer": "^19.11.1"
+    "puppeteer-core": "^19.11.1"
   }
 }
