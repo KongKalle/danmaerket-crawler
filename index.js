@@ -16,7 +16,7 @@ async function fetchHtml(url) {
     browser = await puppeteer.launch({
       headless: 'new',
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      executablePath: '/usr/bin/chromium-browser'
+      executablePath: '/usr/bin/chromium'
 
     });
 
