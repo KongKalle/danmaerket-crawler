@@ -41,8 +41,22 @@ function isInternalLink(base, link) {
 }
 
 function shouldInclude(link) {
-  // Udeluk produkt-URLs
-  return !link.includes('/products/');
+  // Kun inkluder links der typisk indeholder firmainformation
+  const whitelist = [
+    'kontakt',
+    'om',
+    'handelsbetingelser',
+    'betingelser',
+    'vilkår',
+    'cvr',
+    'terms',
+    'about',
+    'policy',
+    'privacy',
+    'refund',
+    'return'
+  ];
+  return whitelist.some(word => link.toLowerCase().includes(word));
 }
 
 async function fetchHtml(url) {
@@ -82,12 +96,7 @@ app.post('/crawl', async (req, res) => {
     $('a[href]').each((_, el) => {
       const href = $(el).attr('href');
       const normalized = normalizeUrl(currentUrl, href);
-      if (
-        normalized &&
-        !visited.has(normalized) &&
-        isInternalLink(url, normalized) &&
-        shouldInclude(normalized)
-      ) {
+      if (normalized && !visited.has(normalized) && isInternalLink(url, normalized) && shouldInclude(normalized)) {
         toVisit.push(normalized);
       }
     });
