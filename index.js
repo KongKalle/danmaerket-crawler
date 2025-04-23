@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core'); // <- Korrekt core-udgave
 const app = express();
 
 // Middleware
@@ -11,14 +11,10 @@ app.use(express.json());
 async function fetchHtml(url) {
   let browser;
   try {
-    const puppeteer = require('puppeteer');
-    const fetcher = puppeteer.createBrowserFetcher();
-    const revisionInfo = fetcher.revisionInfo('1069273');
-
     browser = await puppeteer.launch({
       headless: 'new',
       args: ['--no-sandbox'],
-      executablePath: revisionInfo.executablePath
+      executablePath: '/opt/render/project/.cache/puppeteer/chrome/linux-1069273/chrome-linux/chrome'
     });
 
     const page = await browser.newPage();
@@ -36,7 +32,6 @@ async function fetchHtml(url) {
     }
   }
 }
-
 
 // API-endpoint til crawling
 app.post('/crawl', async (req, res) => {
