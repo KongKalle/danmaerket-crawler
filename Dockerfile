@@ -3,7 +3,7 @@ FROM node:18-slim
 # Installer nødvendige systempakker og Chromium-browser
 RUN apt-get update && \
     apt-get install -y \
-        chromium-browser \
+        chromium \
         libnss3 \
         libatk1.0-0 \
         libatk-bridge2.0-0 \
