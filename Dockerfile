@@ -30,4 +30,7 @@ RUN npm install
 
 EXPOSE 10000
 
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
+
 CMD ["node", "index.js"]
