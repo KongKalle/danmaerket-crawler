@@ -11,10 +11,19 @@ app.use(express.json());
 async function fetchHtml(url) {
   let browser;
   try {
+    const puppeteer = require('puppeteer-core');
+    const path = require('path');
+    const executablePath = path.resolve(
+      __dirname,
+      '.cache/puppeteer/chrome/linux-1069273/chrome-linux/chrome'
+    );
+
+    console.log('🔍 Bruger Chromium fra:', executablePath);
+
     browser = await puppeteer.launch({
       headless: 'new',
       args: ['--no-sandbox'],
-      executablePath: '/opt/render/project/.cache/puppeteer/chrome/linux-1069273/chrome-linux/chrome'
+      executablePath
     });
 
     const page = await browser.newPage();
@@ -32,6 +41,7 @@ async function fetchHtml(url) {
     }
   }
 }
+
 
 // API-endpoint til crawling
 app.post('/crawl', async (req, res) => {
