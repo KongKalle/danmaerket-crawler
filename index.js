@@ -13,7 +13,8 @@ async function fetchHtml(url) {
   try {
     browser = await puppeteer.launch({
       headless: 'new', // Fremtidssikret headless mode
-      args: ['--no-sandbox']
+      args: ['--no-sandbox'],
+      executablePath: '/opt/render/.cache/puppeteer/chrome/linux-1069273/chrome-linux/chrome' // Fast sti til Chromium
     });
 
     const page = await browser.newPage();
