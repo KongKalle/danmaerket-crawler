@@ -1,83 +1,90 @@
+// index.js – Danmærket crawler med loop-beskyttelse, begrænset dybde og filtrering
+
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const cheerio = require('cheerio');
-const app = express();
+const { URL } = require('url');
 
+const app = express();
 app.use(cors());
 app.use(express.json());
 
-const MAX_SUBPAGES = 5;
+const MAX_PAGES = 10;
+const visited = new Set();
+
+function isValidLink(href, baseHost) {
+  if (!href) return false;
+  if (href.startsWith('mailto:') || href.startsWith('tel:')) return false;
+  if (href.endsWith('.css') || href.endsWith('.js') || href.endsWith('.jpg') || href.endsWith('.png') || href.endsWith('.svg')) return false;
+  if (href.includes('?') || href.includes('#')) return false;
+  try {
+    const url = new URL(href, baseHost);
+    return url.hostname === baseHost.hostname;
+  } catch {
+    return false;
+  }
+}
+
+async function fetchAndExtract(url, baseHost) {
+  if (visited.has(url) || visited.size >= MAX_PAGES) return '';
+
+  console.log('🌐 Henter:', url);
+  visited.add(url);
+
+  try {
+    const response = await axios.get(url, {
+      headers: {
+        'User-Agent': 'DanmaerketBot/1.0',
+        'Accept': 'text/html',
+      },
+      timeout: 10000,
+    });
+
+    const html = response.data;
+    const $ = cheerio.load(html);
+    let textContent = $('body').html() || '';
+
+    const links = [];
+    $('a[href]').each((_, el) => {
+      const href = $(el).attr('href');
+      if (isValidLink(href, baseHost)) {
+        try {
+          const fullUrl = new URL(href, baseHost).toString();
+          if (!visited.has(fullUrl)) links.push(fullUrl);
+        } catch {}
+      }
+    });
+
+    for (const link of links.slice(0, 3)) {
+      textContent += await fetchAndExtract(link, baseHost);
+    }
+
+    return textContent;
+  } catch (error) {
+    console.error('❌ Fejl ved hentning:', url, error.message);
+    return '';
+  }
+}
 
 app.post('/crawl', async (req, res) => {
   const { url } = req.body;
-  console.log("📥 Modtaget URL:", url);
+  console.log('📥 Modtaget URL:', url);
 
-  if (!url || !url.startsWith('http')) {
-    return res.status(400).json({ error: 'Ugyldig URL modtaget.' });
-  }
+  if (!url) return res.status(400).json({ error: 'URL mangler.' });
 
   try {
-    const visited = new Set();
-    const toVisit = [url];
-    let combinedHTML = '';
+    const baseHost = new URL(url);
+    visited.clear();
+    const resultHtml = await fetchAndExtract(url, baseHost);
 
-    while (toVisit.length > 0 && visited.size < MAX_SUBPAGES + 1) {
-      const currentUrl = toVisit.shift();
-      const cleanUrl = currentUrl.split('#')[0]; // Fjern fragment
-
-      if (visited.has(cleanUrl)) continue;
-
-      console.log("🌐 Henter:", cleanUrl);
-      visited.add(cleanUrl);
-
-      try {
-        const response = await axios.get(cleanUrl, {
-          headers: {
-            'User-Agent': 'DanmaerketBot/1.0',
-            'Accept': 'text/html',
-          },
-          timeout: 10000,
-        });
-
-        const html = response.data;
-        combinedHTML += `\n\n<!-- BEGIN ${cleanUrl} -->\n\n` + html;
-
-        const $ = cheerio.load(html);
-        const baseHost = new URL(url).hostname;
-
-        $('a[href]').each((_, el) => {
-          if (toVisit.length >= MAX_SUBPAGES) return false; // Begræns crawl-dybde
-
-          let href = $(el).attr('href');
-          if (!href || href.startsWith('mailto:') || href.startsWith('tel:')) return;
-
-          // Byg absolut URL og fjern fragment
-          try {
-            let absoluteUrl = new URL(href, cleanUrl).href;
-            absoluteUrl = absoluteUrl.split('#')[0];
-
-            // Spring hvis ekstern eller fil (fx .css, .js, .svg)
-            const linkHost = new URL(absoluteUrl).hostname;
-            const isAsset = absoluteUrl.match(/\.(css|js|png|jpg|jpeg|gif|svg|woff|ttf|eot|ico)$/i);
-            if (linkHost !== baseHost || isAsset) return;
-
-            if (!visited.has(absoluteUrl) && !toVisit.includes(absoluteUrl)) {
-              toVisit.push(absoluteUrl);
-            }
-          } catch (e) {
-            return;
-          }
-        });
-
-      } catch (err) {
-        console.warn(`⚠️ Fejl ved ${cleanUrl}:`, err.message);
-      }
+    if (!resultHtml || resultHtml.length < 100) {
+      return res.status(422).json({ error: 'Ingen anvendeligt HTML-indhold fundet.' });
     }
 
-    return res.json({ html: combinedHTML });
+    return res.json({ html: resultHtml });
   } catch (error) {
-    console.error('🚨 Fejl i crawl:', error.message);
+    console.error('❌ Crawler fejl:', error.message);
     return res.status(500).json({ error: 'Crawler fejlede: ' + error.message });
   }
 });
