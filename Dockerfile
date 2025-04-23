@@ -1,9 +1,9 @@
 FROM node:18-slim
 
-# Installer nødvendige systempakker og Chromium
+# Installer nødvendige systempakker og Chromium-browser
 RUN apt-get update && \
     apt-get install -y \
-        chromium \
+        chromium-browser \
         libnss3 \
         libatk1.0-0 \
         libatk-bridge2.0-0 \
@@ -20,8 +20,8 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# 👇 Her skal den stå (KUN her!)
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+# Miljøvariabel (kan bruges til debugging/log)
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 WORKDIR /app
 COPY . .
