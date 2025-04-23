@@ -1,43 +1,41 @@
 const express = require('express');
 const cors = require('cors');
-const puppeteer = require('puppeteer-core');
-const chromium = require('chrome-aws-lambda');
+const puppeteer = require('puppeteer');
+
 const app = express();
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 
+// Puppeteer-funktion
 async function fetchHtml(url) {
   let browser;
   try {
-    const executablePath = await chromium.executablePath;
-
-    if (!executablePath) {
-      throw new Error('🔴 chromium.executablePath returnerede undefined');
-    }
-
-    console.log('🔍 Bruger Chromium fra:', executablePath);
+    console.log('🔍 Starter Chromium via puppeteer...');
 
     browser = await puppeteer.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath,
-      headless: chromium.headless,
+      headless: true,
+      args: ['--no-sandbox']
     });
 
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 20000 });
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(2000); // Valgfri buffer
+
     const content = await page.content();
     return content;
   } catch (err) {
     console.error('❌ Puppeteer fejl:', err.message);
     return '';
   } finally {
-    if (browser) await browser.close();
+    if (browser) {
+      await browser.close();
+    }
   }
 }
 
+// API-endpoint til crawling
 app.post('/crawl', async (req, res) => {
   const { url } = req.body;
 
@@ -61,6 +59,7 @@ app.post('/crawl', async (req, res) => {
   }
 });
 
+// Start server
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`✅ Danmærket crawler kører på port ${PORT}`);
