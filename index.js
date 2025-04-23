@@ -1,24 +1,30 @@
+const express = require('express');
+const cors = require('cors');
 const puppeteer = require('puppeteer');
+const app = express();
 
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// Puppeteer-funktion
 async function fetchHtml(url) {
   let browser;
   try {
     browser = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox'],
-      executablePath: '/usr/bin/google-chrome-stable' // Brug evt. '/usr/bin/chromium-browser' hvis den anden ikke virker
+      executablePath: '/usr/bin/google-chrome-stable' // Brug evt. '/usr/bin/chromium-browser'
     });
 
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 20000 });
-
-    // Vent lidt ekstra tid i tilfælde af langsom JS-loading
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(2000); // Vent ekstra tid
 
     const content = await page.content();
     return content;
   } catch (err) {
-    console.log('❌ Puppeteer fejl:', err.message);
+    console.error('❌ Puppeteer fejl:', err.message);
     return '';
   } finally {
     if (browser) {
@@ -26,3 +32,30 @@ async function fetchHtml(url) {
     }
   }
 }
+
+// API-endpoint til crawling
+app.post('/crawl', async (req, res) => {
+  const { url } = req.body;
+
+  if (!url) {
+    return res.status(400).json({ error: 'Ingen URL modtaget.' });
+  }
+
+  try {
+    console.log('🔍 Crawler modtaget URL:', url);
+    const html = await fetchHtml(url);
+    if (!html || html.trim().length < 100) {
+      return res.status(500).json({ error: 'HTML indhold for begrænset eller tomt.' });
+    }
+    return res.json({ html });
+  } catch (err) {
+    console.error('❌ Fejl under crawling:', err.message);
+    return res.status(500).json({ error: 'Intern serverfejl' });
+  }
+});
+
+// Start server
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => {
+  console.log(`✅ Danmærket crawler kører på port ${PORT}`);
+});
