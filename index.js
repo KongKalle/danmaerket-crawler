@@ -12,11 +12,16 @@ async function fetchHtml(url) {
   try {
     const executablePath = await chromium.executablePath;
 
+    if (!executablePath) {
+      throw new Error('🔴 chromium.executablePath returnerede undefined');
+    }
+
+    console.log('🔍 Bruger Chromium fra:', executablePath);
+
     browser = await puppeteer.launch({
       args: chromium.args,
       defaultViewport: chromium.defaultViewport,
-      executablePath: executablePath,
-
+      executablePath,
       headless: chromium.headless,
     });
 
