@@ -3,11 +3,11 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "postinstall": "echo \"Chromium klar via systempakker\""
+    "start": "node index.js"
   },
   "dependencies": {
     "express": "^4.18.2",
     "cors": "^2.8.5",
-    "puppeteer-core": "^19.11.1"
+    "puppeteer-core": "^21.3.8"
   }
 }
