@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
 
 const app = express();
 app.use(cors());
@@ -9,11 +9,12 @@ app.use(express.json());
 async function fetchHtml(url) {
   let browser;
   try {
-    console.log('🔍 Starter Chromium...');
+    console.log('🔍 Starter Chromium fra: /usr/bin/chromium');
 
     browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox']
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      executablePath: '/usr/bin/chromium'
     });
 
     const page = await browser.newPage();
