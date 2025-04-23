@@ -1,85 +1,95 @@
-// index.js
-const express = require('express');
-const cors = require('cors');
+""const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
-const { URL } = require('url');
-
+const cors = require('cors');
 const app = express();
-app.use(cors());
+
 app.use(express.json());
+app.use(cors());
+
+const PORT = process.env.PORT || 10000;
+
+function isHtml(contentType) {
+  return contentType && contentType.includes('text/html');
+}
+
+function isValidUrl(url) {
+  try {
+    new URL(url);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function normalizeUrl(base, relative) {
+  try {
+    return new URL(relative, base).toString().split('#')[0];
+  } catch {
+    return null;
+  }
+}
+
+function isInternalLink(base, link) {
+  try {
+    const baseHost = new URL(base).host;
+    const linkHost = new URL(link).host;
+    return baseHost === linkHost;
+  } catch {
+    return false;
+  }
+}
+
+function shouldInclude(link) {
+  return !link.includes('/products/');
+}
+
+async function fetchHtml(url) {
+  try {
+    const response = await axios.get(url, { timeout: 10000 });
+    if (isHtml(response.headers['content-type'])) {
+      return response.data;
+    }
+  } catch (err) {
+    console.log('❌ Crawler fejl:', err.message);
+  }
+  return '';
+}
 
 app.post('/crawl', async (req, res) => {
   const { url } = req.body;
-  console.log("📥 Modtaget URL:", url);
+  console.log('📥 Modtaget URL:', url);
 
-  if (!url || !url.startsWith('http')) {
+  if (!isValidUrl(url)) {
     return res.status(400).json({ error: 'Ugyldig URL' });
   }
 
   const visited = new Set();
   const toVisit = [url];
-  const maxPages = 10;
   let combinedHtml = '';
-  let pagesCrawled = 0;
 
-  while (toVisit.length > 0 && pagesCrawled < maxPages) {
+  while (toVisit.length > 0 && visited.size < 10) {
     const currentUrl = toVisit.shift();
-    if (visited.has(currentUrl)) continue;
+    if (!currentUrl || visited.has(currentUrl)) continue;
+
     visited.add(currentUrl);
+    console.log('🌐 Henter:', currentUrl);
+    const html = await fetchHtml(currentUrl);
+    combinedHtml += html;
 
-    console.log("🌐 Henter:", currentUrl);
-    try {
-      const response = await axios.get(currentUrl, {
-        headers: { 'User-Agent': 'DanmaerketBot/1.0' },
-        timeout: 10000
-      });
-
-      const html = response.data;
-      combinedHtml += `\n\n<!-- ${currentUrl} -->\n\n` + html;
-      pagesCrawled++;
-
-      const $ = cheerio.load(html);
-      const base = new URL(currentUrl);
-
-      $('a').each((_, el) => {
-        let href = $(el).attr('href');
-        if (!href) return;
-
-        // Fix protokol-relative links
-        if (href.startsWith('//')) {
-          href = 'https:' + href;
-        }
-
-        // Fjern hash og query
-        href = href.split('#')[0].split('?')[0];
-
-        // Lav til absolut URL
-        let newUrl;
-        try {
-          newUrl = new URL(href, base.origin).href;
-        } catch (e) {
-          return;
-        }
-
-        // Begræns til sider og informationssider – undgå /products/ og /collections/
-        if (!newUrl.startsWith(base.origin)) return;
-        if (newUrl.includes('/products/') || newUrl.includes('/collections/')) return;
-
-        if (!visited.has(newUrl) && !toVisit.includes(newUrl)) {
-          toVisit.push(newUrl);
-        }
-      });
-
-    } catch (err) {
-      console.log('❌ Crawler fejl:', err.message);
-    }
+    const $ = cheerio.load(html);
+    $('a[href]').each((_, el) => {
+      const href = $(el).attr('href');
+      const normalized = normalizeUrl(currentUrl, href);
+      if (normalized && !visited.has(normalized) && isInternalLink(url, normalized) && shouldInclude(normalized)) {
+        toVisit.push(normalized);
+      }
+    });
   }
 
   res.json({ html: combinedHtml });
 });
 
-const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`✅ Danmærket crawler kører på port ${PORT}`);
-});
+});""
