@@ -1,28 +1,40 @@
-const express = require("express");
-const puppeteer = require("puppeteer");
+const express = require('express');
+const cors = require('cors');
+const axios = require('axios');
 const app = express();
+
+app.use(cors());
 app.use(express.json());
 
-app.post("/crawl", async (req, res) => {
+app.post('/crawl', async (req, res) => {
   const { url } = req.body;
-  if (!url) return res.status(400).json({ error: "URL mangler" });
+
+  if (!url) {
+    return res.status(400).json({ error: 'URL mangler.' });
+  }
 
   try {
-    const browser = await puppeteer.launch({
-      headless: "new",
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    const response = await axios.get(url, {
+      headers: {
+        'User-Agent': 'DanmaerketBot/1.0',
+        'Accept': 'text/html',
+      },
+      timeout: 10000,
     });
-    const page = await browser.newPage();
-    await page.goto(url, { waitUntil: "networkidle2", timeout: 30000 });
 
-    const html = await page.content();
-    await browser.close();
+    // Tjek om der er HTML (basic sanity check)
+    if (!response.data || !response.headers['content-type'].includes('text/html')) {
+      return res.status(422).json({ error: 'Ingen HTML fundet på siden.' });
+    }
 
-    res.json({ html });
-  } catch (err) {
-    res.status(500).json({ error: "Fejl under rendering", details: err.message });
+    return res.json({ html: response.data });
+  } catch (error) {
+    console.error('Fejl ved crawl:', error.message);
+    return res.status(500).json({ error: 'Crawler fejlede: ' + error.message });
   }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Crawler kører på port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Danmærket crawler kører på port ${PORT}`);
+});
