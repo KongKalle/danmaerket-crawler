@@ -12,9 +12,8 @@ async function fetchHtml(url) {
   let browser;
   try {
     browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox'],
-      executablePath: '/usr/bin/google-chrome-stable' // Brug evt. '/usr/bin/chromium-browser'
+      headless: 'new', // Fremtidssikret headless mode
+      args: ['--no-sandbox']
     });
 
     const page = await browser.newPage();
@@ -44,9 +43,12 @@ app.post('/crawl', async (req, res) => {
   try {
     console.log('🔍 Crawler modtaget URL:', url);
     const html = await fetchHtml(url);
+
     if (!html || html.trim().length < 100) {
+      console.warn('⚠️ HTML indhold for tomt eller for begrænset');
       return res.status(500).json({ error: 'HTML indhold for begrænset eller tomt.' });
     }
+
     return res.json({ html });
   } catch (err) {
     console.error('❌ Fejl under crawling:', err.message);
