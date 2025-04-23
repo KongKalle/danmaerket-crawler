@@ -41,6 +41,7 @@ function isInternalLink(base, link) {
 }
 
 function shouldInclude(link) {
+  // Kun inkluder links der typisk indeholder firmainformation
   const whitelist = [
     'kontakt',
     'om',
@@ -55,25 +56,21 @@ function shouldInclude(link) {
     'refund',
     'return'
   ];
+
   const blacklist = [
+    '/produkt/',
+    '/produkt-kategori/',
     '/products/',
     '/collections/'
   ];
-  const pathname = new URL(link, 'https://dummy.dk').pathname.toLowerCase();
-  return (
-    whitelist.some(word => pathname.includes(word)) &&
-    !blacklist.some(pattern => pathname.includes(pattern))
-  );
-}
 
-const extraPolicyPaths = [
-  '/policies/privacy-policy',
-  '/policies/refund-policy',
-  '/policies/terms-of-service',
-  '/policies/shipping-policy',
-  '/policies/legal-notice',
-  '/policies/contact-information'
-];
+  const lowerLink = link.toLowerCase();
+  if (blacklist.some(bl => lowerLink.includes(bl))) {
+    return false;
+  }
+
+  return whitelist.some(word => lowerLink.includes(word));
+}
 
 async function fetchHtml(url) {
   try {
@@ -95,12 +92,11 @@ app.post('/crawl', async (req, res) => {
     return res.status(400).json({ error: 'Ugyldig URL' });
   }
 
-  const base = new URL(url).origin;
   const visited = new Set();
-  const toVisit = [url, ...extraPolicyPaths.map(path => base + path)];
+  const toVisit = [url];
   let combinedHtml = '';
 
-  while (toVisit.length > 0 && visited.size < 15) {
+  while (toVisit.length > 0 && visited.size < 10) {
     const currentUrl = toVisit.shift();
     if (!currentUrl || visited.has(currentUrl)) continue;
 
