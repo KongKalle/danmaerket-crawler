@@ -1,23 +1,17 @@
-# Start fra en officiel Node image
 FROM node:18-slim
 
-# Installer Chromium og afhængigheder
+# Installer Chromium (og nødvendige fonts og afhængigheder)
 RUN apt-get update && \
-    apt-get install -y chromium && \
+    apt-get install -y chromium chromium-driver fonts-liberation libappindicator3-1 libasound2 libatk-bridge2.0-0 libatk1.0-0 libcups2 libdbus-1-3 libgdk-pixbuf2.0-0 libnspr4 libnss3 libx11-xcb1 libxcomposite1 libxdamage1 libxrandr2 xdg-utils wget && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Opret arbejdsmappe
 WORKDIR /app
 
-# Kopier projektfiler ind
 COPY . .
 
-# Installer afhængigheder
 RUN npm install
 
-# Eksponér porten (Render bruger denne)
 EXPOSE 10000
 
-# Start appen
 CMD ["node", "index.js"]
