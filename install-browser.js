@@ -1,10 +1,10 @@
-const puppeteer = require('puppeteer-core');
+const puppeteer = require('puppeteer'); // <-- brug ikke puppeteer-core her!
 
 console.log('🔧 Install-script: Starter download af Chromium...');
 
 puppeteer
   .createBrowserFetcher()
-  .download('1069273') // Revision for v19.11.1
+  .download('1069273')
   .then(() => {
     console.log('✅ Chromium installeret (rev. 1069273)');
   })
