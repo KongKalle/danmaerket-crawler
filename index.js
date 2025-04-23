@@ -41,7 +41,6 @@ function isInternalLink(base, link) {
 }
 
 function shouldInclude(link) {
-  // Kun inkluder links der typisk indeholder firmainformation
   const whitelist = [
     'kontakt',
     'om',
@@ -56,8 +55,18 @@ function shouldInclude(link) {
     'refund',
     'return'
   ];
-  return whitelist.some(word => link.toLowerCase().includes(word));
+  const pathname = new URL(link, 'https://dummy.dk').pathname.toLowerCase();
+  return whitelist.some(word => pathname.includes(word));
 }
+
+const extraPolicyPaths = [
+  '/policies/privacy-policy',
+  '/policies/refund-policy',
+  '/policies/terms-of-service',
+  '/policies/shipping-policy',
+  '/policies/legal-notice',
+  '/policies/contact-information'
+];
 
 async function fetchHtml(url) {
   try {
@@ -79,11 +88,12 @@ app.post('/crawl', async (req, res) => {
     return res.status(400).json({ error: 'Ugyldig URL' });
   }
 
+  const base = new URL(url).origin;
   const visited = new Set();
-  const toVisit = [url];
+  const toVisit = [url, ...extraPolicyPaths.map(path => base + path)];
   let combinedHtml = '';
 
-  while (toVisit.length > 0 && visited.size < 10) {
+  while (toVisit.length > 0 && visited.size < 15) {
     const currentUrl = toVisit.shift();
     if (!currentUrl || visited.has(currentUrl)) continue;
 
