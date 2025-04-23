@@ -10,7 +10,8 @@ async function fetchHtml(url) {
   let browser;
   try {
     console.log('🔍 Crawler modtaget URL:', url);
-    console.log('🔍 Starter Chromium fra:', process.env.PUPPETEER_EXECUTABLE_PATH);
+    console.log('🔍 Starter Chromium fra: /usr/bin/chromium');
+
 
     browser = await puppeteer.launch({
       headless: 'new',
