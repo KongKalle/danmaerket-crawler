@@ -9,12 +9,13 @@ app.use(express.json());
 async function fetchHtml(url) {
   let browser;
   try {
-    console.log('🔍 Starter Chromium fra: /usr/bin/chromium');
+    console.log('🔍 Crawler modtaget URL:', url);
+    console.log('🔍 Starter Chromium fra:', process.env.PUPPETEER_EXECUTABLE_PATH);
 
     browser = await puppeteer.launch({
       headless: 'new',
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      executablePath: '/usr/bin/chromium-browser'
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH
     });
 
     const page = await browser.newPage();
@@ -38,7 +39,6 @@ app.post('/crawl', async (req, res) => {
   }
 
   try {
-    console.log('🔍 Crawler modtaget URL:', url);
     const html = await fetchHtml(url);
 
     if (!html || html.trim().length < 100) {
