@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
-const cheerio = require('cheerio'); // Bruges til at parse HTML
+const cheerio = require('cheerio');
 const app = express();
 
 app.use(cors());
@@ -24,13 +24,15 @@ app.post('/crawl', async (req, res) => {
 
     while (toVisit.length > 0 && visited.size < MAX_SUBPAGES + 1) {
       const currentUrl = toVisit.shift();
-      if (visited.has(currentUrl)) continue;
+      const cleanUrl = currentUrl.split('#')[0]; // Fjern fragment
 
-      console.log("🌐 Henter:", currentUrl);
-      visited.add(currentUrl);
+      if (visited.has(cleanUrl)) continue;
+
+      console.log("🌐 Henter:", cleanUrl);
+      visited.add(cleanUrl);
 
       try {
-        const response = await axios.get(currentUrl, {
+        const response = await axios.get(cleanUrl, {
           headers: {
             'User-Agent': 'DanmaerketBot/1.0',
             'Accept': 'text/html',
@@ -39,31 +41,37 @@ app.post('/crawl', async (req, res) => {
         });
 
         const html = response.data;
-        combinedHTML += `\n\n<!-- BEGIN ${currentUrl} -->\n\n` + html;
+        combinedHTML += `\n\n<!-- BEGIN ${cleanUrl} -->\n\n` + html;
 
-        // Parse HTML for interne links (samme domæne)
         const $ = cheerio.load(html);
         const baseHost = new URL(url).hostname;
 
-        $('a[href]').each((i, el) => {
-          const href = $(el).attr('href');
+        $('a[href]').each((_, el) => {
+          if (toVisit.length >= MAX_SUBPAGES) return false; // Begræns crawl-dybde
+
+          let href = $(el).attr('href');
           if (!href || href.startsWith('mailto:') || href.startsWith('tel:')) return;
 
-          let absoluteUrl;
+          // Byg absolut URL og fjern fragment
           try {
-            absoluteUrl = new URL(href, currentUrl).href;
+            let absoluteUrl = new URL(href, cleanUrl).href;
+            absoluteUrl = absoluteUrl.split('#')[0];
+
+            // Spring hvis ekstern eller fil (fx .css, .js, .svg)
+            const linkHost = new URL(absoluteUrl).hostname;
+            const isAsset = absoluteUrl.match(/\.(css|js|png|jpg|jpeg|gif|svg|woff|ttf|eot|ico)$/i);
+            if (linkHost !== baseHost || isAsset) return;
+
+            if (!visited.has(absoluteUrl) && !toVisit.includes(absoluteUrl)) {
+              toVisit.push(absoluteUrl);
+            }
           } catch (e) {
             return;
-          }
-
-          const linkHost = new URL(absoluteUrl).hostname;
-          if (linkHost === baseHost && !visited.has(absoluteUrl) && !toVisit.includes(absoluteUrl)) {
-            toVisit.push(absoluteUrl);
           }
         });
 
       } catch (err) {
-        console.warn(`⚠️ Fejl ved ${currentUrl}:`, err.message);
+        console.warn(`⚠️ Fejl ved ${cleanUrl}:`, err.message);
       }
     }
 
