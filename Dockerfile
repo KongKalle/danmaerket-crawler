@@ -20,7 +20,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Sæt miljøvariabel så Puppeteer-core ved, hvor den skal finde browseren
+# 👇 Her skal den stå (KUN her!)
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 WORKDIR /app
@@ -29,8 +29,5 @@ COPY . .
 RUN npm install
 
 EXPOSE 10000
-
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-
 
 CMD ["node", "index.js"]
