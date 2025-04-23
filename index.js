@@ -11,15 +11,19 @@ app.use(express.json());
 async function fetchHtml(url) {
   let browser;
   try {
+    const puppeteer = require('puppeteer');
+    const fetcher = puppeteer.createBrowserFetcher();
+    const revisionInfo = fetcher.revisionInfo('1069273');
+
     browser = await puppeteer.launch({
-      headless: 'new', // Fremtidssikret headless mode
+      headless: 'new',
       args: ['--no-sandbox'],
-      executablePath: '/opt/render/.cache/puppeteer/chrome/linux-1069273/chrome-linux/chrome' // Fast sti til Chromium
+      executablePath: revisionInfo.executablePath
     });
 
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 20000 });
-    await page.waitForTimeout(2000); // Vent ekstra tid
+    await page.waitForTimeout(2000);
 
     const content = await page.content();
     return content;
@@ -32,6 +36,7 @@ async function fetchHtml(url) {
     }
   }
 }
+
 
 // API-endpoint til crawling
 app.post('/crawl', async (req, res) => {
