@@ -3,26 +3,9 @@ const cors = require('cors');
 const puppeteer = require('puppeteer');
 
 const app = express();
-
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Først: Tving download af Chromium hvis mangler
-puppeteer.install().then(() => {
-  console.log('✅ Chromium installeret');
-
-  // Start server først når browseren er klar
-  const PORT = process.env.PORT || 10000;
-  app.listen(PORT, () => {
-    console.log(`✅ Danmærket crawler kører på port ${PORT}`);
-  });
-}).catch(err => {
-  console.error('❌ Fejl under installation af Chromium:', err.message);
-  process.exit(1);
-});
-
-// Puppeteer-funktion
 async function fetchHtml(url) {
   let browser;
   try {
@@ -37,8 +20,7 @@ async function fetchHtml(url) {
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 20000 });
     await page.waitForTimeout(2000);
 
-    const content = await page.content();
-    return content;
+    return await page.content();
   } catch (err) {
     console.error('❌ Puppeteer fejl:', err.message);
     return '';
@@ -47,7 +29,6 @@ async function fetchHtml(url) {
   }
 }
 
-// API-endpoint til crawling
 app.post('/crawl', async (req, res) => {
   const { url } = req.body;
 
@@ -69,4 +50,9 @@ app.post('/crawl', async (req, res) => {
     console.error('❌ Fejl under crawling:', err.message);
     return res.status(500).json({ error: 'Intern serverfejl' });
   }
+});
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => {
+  console.log(`✅ Danmærket crawler kører på port ${PORT}`);
 });
