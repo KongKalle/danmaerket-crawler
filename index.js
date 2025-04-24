@@ -6,33 +6,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-async function fetchHtml(url) {
-  let browser;
-  try {
-    console.log('🔍 Crawler modtaget URL:', url);
-    console.log('🔍 Starter Chromium fra: /usr/bin/chromium');
-
-
-    browser = await puppeteer.launch({
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      executablePath: '/usr/bin/chromium'
-
-    });
-
-    const page = await browser.newPage();
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 20000 });
-    await page.waitForTimeout(2000);
-
-    return await page.content();
-  } catch (err) {
-    console.error('❌ Puppeteer fejl:', err.message);
-    return '';
-  } finally {
-    if (browser) await browser.close();
-  }
-}
-
 app.post('/crawl', async (req, res) => {
   const { urls } = req.body;
 
@@ -45,6 +18,7 @@ app.post('/crawl', async (req, res) => {
 
   try {
     console.log('🔍 Crawler modtager URL-liste:', urls);
+
     browser = await puppeteer.launch({
       headless: 'new',
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
@@ -53,14 +27,23 @@ app.post('/crawl', async (req, res) => {
 
     const page = await browser.newPage();
 
+    // Brug en almindelig desktop user-agent
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+      '(KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36'
+    );
+
     for (const url of urls) {
       console.log('🌐 Besøger:', url);
       try {
-        await page.goto(url, { waitUntil: 'networkidle2', timeout: 20000 });
-        await page.waitForTimeout(1000); // lidt luft til at load'e
+        await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+        await page.waitForTimeout(2000);
+
         const html = await page.content();
         if (html && html.length > 0) {
-          combinedHtml += '\n<!-- START: ' + url + ' -->\n' + html + '\n<!-- END: ' + url + ' -->\n';
+          combinedHtml += `\n<!-- START: ${url} -->\n${html}\n<!-- END: ${url} -->\n`;
+        } else {
+          console.warn(`⚠️ Ingen HTML returneret for ${url}`);
         }
       } catch (innerErr) {
         console.warn(`⚠️ Fejl ved ${url}: ${innerErr.message}`);
@@ -76,9 +59,19 @@ app.post('/crawl', async (req, res) => {
 
   } catch (err) {
     console.error('❌ Fejl under crawl:', err.message);
-    return res.status(500).json({ error: 'Intern serverfejl' });
+    return res.status(500).json({ error: 'Crawler fejlede: ' + err.message });
   } finally {
-    if (browser) await browser.close();
+    if (browser) {
+      try {
+        await browser.close();
+      } catch (closeErr) {
+        console.warn('⚠️ Kunne ikke lukke browser:', closeErr.message);
+      }
+    }
   }
 });
 
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => {
+  console.log(`✅ Danmærket crawler kører på port ${PORT}`);
+});
