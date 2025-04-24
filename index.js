@@ -14,7 +14,6 @@ app.post('/crawl', async (req, res) => {
   }
 
   let browser;
-  let combinedHtml = '';
 
   try {
     console.log('🔍 Crawler modtager URL-liste:', urls);
@@ -25,30 +24,35 @@ app.post('/crawl', async (req, res) => {
       executablePath: '/usr/bin/chromium'
     });
 
-    const page = await browser.newPage();
-
-    // Brug en almindelig desktop user-agent
-    await page.setUserAgent(
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
-      '(KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36'
-    );
-
-    for (const url of urls) {
-      console.log('🌐 Besøger:', url);
+    // Parallel crawling af alle URL'er
+    const results = await Promise.all(urls.map(async (url) => {
+      const page = await browser.newPage();
       try {
-        await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
-        await page.waitForTimeout(2000);
+        await page.setUserAgent(
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+          '(KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36'
+        );
+
+        console.log('🌐 Læser:', url);
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
 
         const html = await page.content();
+        await page.close();
+
         if (html && html.length > 0) {
-          combinedHtml += `\n<!-- START: ${url} -->\n${html}\n<!-- END: ${url} -->\n`;
+          return `\n<!-- START: ${url} -->\n${html}\n<!-- END: ${url} -->\n`;
         } else {
-          console.warn(`⚠️ Ingen HTML returneret for ${url}`);
+          console.warn(`⚠️ Ingen HTML fundet på ${url}`);
+          return '';
         }
-      } catch (innerErr) {
-        console.warn(`⚠️ Fejl ved ${url}: ${innerErr.message}`);
+      } catch (err) {
+        console.warn(`⚠️ Fejl ved ${url}: ${err.message}`);
+        await page.close();
+        return '';
       }
-    }
+    }));
+
+    const combinedHtml = results.join('');
 
     if (combinedHtml.trim().length < 100) {
       console.warn('⚠️ Kombineret HTML er for begrænset.');
