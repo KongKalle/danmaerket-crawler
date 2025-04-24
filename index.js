@@ -34,28 +34,51 @@ async function fetchHtml(url) {
 }
 
 app.post('/crawl', async (req, res) => {
-  const { url } = req.body;
+  const { urls } = req.body;
 
-  if (!url) {
-    return res.status(400).json({ error: 'Ingen URL modtaget.' });
+  if (!urls || !Array.isArray(urls) || urls.length === 0) {
+    return res.status(400).json({ error: 'Ingen URL-liste modtaget.' });
   }
+
+  let browser;
+  let combinedHtml = '';
 
   try {
-    const html = await fetchHtml(url);
+    console.log('🔍 Crawler modtager URL-liste:', urls);
+    browser = await puppeteer.launch({
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      executablePath: '/usr/bin/chromium'
+    });
 
-    if (!html || html.trim().length < 100) {
-      console.warn('⚠️ HTML indhold for tomt eller for begrænset');
-      return res.status(500).json({ error: 'HTML indhold for begrænset eller tomt.' });
+    const page = await browser.newPage();
+
+    for (const url of urls) {
+      console.log('🌐 Besøger:', url);
+      try {
+        await page.goto(url, { waitUntil: 'networkidle2', timeout: 20000 });
+        await page.waitForTimeout(1000); // lidt luft til at load'e
+        const html = await page.content();
+        if (html && html.length > 0) {
+          combinedHtml += '\n<!-- START: ' + url + ' -->\n' + html + '\n<!-- END: ' + url + ' -->\n';
+        }
+      } catch (innerErr) {
+        console.warn(`⚠️ Fejl ved ${url}: ${innerErr.message}`);
+      }
     }
 
-    return res.json({ html });
+    if (combinedHtml.trim().length < 100) {
+      console.warn('⚠️ Kombineret HTML er for begrænset.');
+      return res.status(500).json({ error: 'Ingen brugbar HTML fundet.' });
+    }
+
+    return res.json({ html: combinedHtml });
+
   } catch (err) {
-    console.error('❌ Fejl under crawling:', err.message);
+    console.error('❌ Fejl under crawl:', err.message);
     return res.status(500).json({ error: 'Intern serverfejl' });
+  } finally {
+    if (browser) await browser.close();
   }
 });
 
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => {
-  console.log(`✅ Danmærket crawler kører på port ${PORT}`);
-});
