@@ -7,6 +7,8 @@ app.use(cors());
 app.use(express.json());
 
 app.post('/crawl', async (req, res) => {
+  console.log('🔎 RAW body modtaget:', req.body); // <-- Sæt denne som første linje i /crawl
+
   const { urls } = req.body;
 
   if (!urls || !Array.isArray(urls) || urls.length === 0) {
