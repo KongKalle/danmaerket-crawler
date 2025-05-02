@@ -6,6 +6,34 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+function checkSchemaMarkup(html) {
+  const schemaRegex = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  const matches = html.match(schemaRegex);
+  if (!matches) return { hasSchema: false, schemaTypes: [] };
+
+  let types = [];
+
+  matches.forEach(match => {
+    try {
+      const jsonStr = match.replace(/<script[^>]*>|<\/script>/gi, '');
+      const data = JSON.parse(jsonStr);
+      if (Array.isArray(data)) {
+        data.forEach(entry => entry["@type"] && types.push(entry["@type"]));
+      } else if (data["@type"]) {
+        types.push(data["@type"]);
+      }
+    } catch (err) {
+      console.warn('⚠️ Schema parsing-fejl:', err.message);
+    }
+  });
+
+  return {
+    hasSchema: types.length > 0,
+    schemaTypes: [...new Set(types)]
+  };
+}
+
+
 app.post('/crawl', async (req, res) => {
   console.log('🔎 RAW body modtaget:', req.body); // <-- Sæt denne som første linje i /crawl
 
@@ -55,13 +83,20 @@ app.post('/crawl', async (req, res) => {
     }));
 
     const combinedHtml = results.join('');
+    const schemaInfo = checkSchemaMarkup(combinedHtml);
+
 
     if (combinedHtml.trim().length < 100) {
       console.warn('⚠️ Kombineret HTML er for begrænset.');
       return res.status(500).json({ error: 'Ingen brugbar HTML fundet.' });
     }
 
-    return res.json({ html: combinedHtml });
+    return res.json({ 
+  html: combinedHtml,
+  hasSchema: schemaInfo.hasSchema,
+  schemaTypes: schemaInfo.schemaTypes
+});
+
 
   } catch (err) {
     console.error('❌ Fejl under crawl:', err.message);
