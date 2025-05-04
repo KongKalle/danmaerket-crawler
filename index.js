@@ -9,30 +9,74 @@ app.use(express.json());
 function checkSchemaMarkup(html) {
   const schemaRegex = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
   const matches = html.match(schemaRegex);
-  if (!matches) return { hasSchema: false, schemaTypes: [] };
+  if (!matches) {
+    return {
+      hasSchema: false,
+      schemaTypes: [],
+      schemaScore: 0,
+      schemaFeedback: ["❌ Ingen schema.org-markup fundet."]
+    };
+  }
 
   let types = [];
+  let score = 0;
+  let feedback = [];
 
   matches.forEach(match => {
     try {
       const jsonStr = match.replace(/<script[^>]*>|<\/script>/gi, '');
       const data = JSON.parse(jsonStr);
-      if (Array.isArray(data)) {
-        data.forEach(entry => entry["@type"] && types.push(entry["@type"]));
-      } else if (data["@type"]) {
-        types.push(data["@type"]);
-      }
+      const entries = Array.isArray(data) ? data : [data];
+
+      entries.forEach(entry => {
+        const type = entry["@type"];
+        if (type) {
+          types.push(type);
+
+          switch (type) {
+            case "Organization":
+              score += 1;
+              feedback.push("✅ Har Organization-schema");
+              break;
+            case "WebSite":
+              score += 1;
+              feedback.push("✅ Har WebSite-schema");
+              break;
+            case "LocalBusiness":
+              score += 2;
+              feedback.push("✅ Har LocalBusiness-schema");
+              break;
+            case "Product":
+            case "Offer":
+              score += 2;
+              feedback.push(`✅ Har ${type}-schema`);
+              break;
+            case "BreadcrumbList":
+              score += 1;
+              feedback.push("✅ Har BreadcrumbList-schema");
+              break;
+            default:
+              feedback.push(`ℹ️ Fundet schema-type: ${type}`);
+          }
+        }
+      });
+
     } catch (err) {
       console.warn('⚠️ Schema parsing-fejl:', err.message);
     }
   });
 
+  if (types.length === 0) {
+    feedback.push("❌ Ingen gyldige schema.org-typer fundet.");
+  }
+
   return {
     hasSchema: types.length > 0,
-    schemaTypes: [...new Set(types)]
+    schemaTypes: [...new Set(types)],
+    schemaScore: score,
+    schemaFeedback: feedback
   };
 }
-
 
 app.post('/crawl', async (req, res) => {
   console.log('🔎 RAW body modtaget:', req.body); // <-- Sæt denne som første linje i /crawl
@@ -94,8 +138,11 @@ app.post('/crawl', async (req, res) => {
     return res.json({ 
   html: combinedHtml,
   hasSchema: schemaInfo.hasSchema,
-  schemaTypes: schemaInfo.schemaTypes
+  schemaTypes: schemaInfo.schemaTypes,
+  schemaScore: schemaInfo.schemaScore,
+  schemaFeedback: schemaInfo.schemaFeedback
 });
+
 
 
   } catch (err) {
