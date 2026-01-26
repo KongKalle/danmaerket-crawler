@@ -5,6 +5,9 @@ const puppeteer = require('puppeteer-core');
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.get("/", (req, res) => res.status(200).send("OK"));
+app.get("/health", (req, res) => res.status(200).json({ status: "ok" }));
+
 
 function checkSchemaMarkup(html) {
   const schemaRegex = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
