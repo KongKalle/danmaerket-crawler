@@ -96,11 +96,10 @@ app.post('/crawl', async (req, res) => {
     console.log('🔍 Crawler modtager URL-liste:', urls);
 
     browser = await puppeteer.launch({
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium'
+  headless: 'new',
+  args: ['--no-sandbox', '--disable-setuid-sandbox']
+});
 
-    });
 
     // Parallel crawling af alle URL'er
     const results = await Promise.all(urls.map(async (url) => {
