@@ -98,7 +98,8 @@ app.post('/crawl', async (req, res) => {
     browser = await puppeteer.launch({
       headless: 'new',
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      executablePath: '/usr/bin/chromium'
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium'
+
     });
 
     // Parallel crawling af alle URL'er
