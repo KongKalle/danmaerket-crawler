@@ -11,8 +11,9 @@ app.get("/health", (req, res) => res.status(200).json({ status: "ok" }));
 
 function checkSchemaMarkup(html) {
   const schemaRegex = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
-  const matches = html.match(schemaRegex);
-  if (!matches) {
+  const matches = [...html.matchAll(schemaRegex)];
+
+  if (matches.length === 0) {
     return {
       hasSchema: false,
       schemaTypes: [],
@@ -21,65 +22,69 @@ function checkSchemaMarkup(html) {
     };
   }
 
-  let types = [];
+  const types = new Set();
   let score = 0;
-  let feedback = [];
+  const feedback = new Set();
 
-  matches.forEach(match => {
+  const scoreMap = {
+    Organization: { score: 1, label: "Organization" },
+    WebSite: { score: 1, label: "WebSite" },
+    LocalBusiness: { score: 2, label: "LocalBusiness" },
+    Product: { score: 2, label: "Product" },
+    Offer: { score: 2, label: "Offer" },
+    BreadcrumbList: { score: 1, label: "BreadcrumbList" }
+  };
+
+  function processEntry(entry) {
+    if (!entry || typeof entry !== "object") return;
+
+    // @graph support
+    if (Array.isArray(entry["@graph"])) {
+      entry["@graph"].forEach(processEntry);
+    }
+
+    const rawType = entry["@type"];
+    const entryTypes = Array.isArray(rawType)
+      ? rawType
+      : rawType
+      ? [rawType]
+      : [];
+
+    entryTypes.forEach(type => {
+      if (!type) return;
+
+      types.add(type);
+
+      if (scoreMap[type]) {
+        score += scoreMap[type].score;
+        feedback.add(`✅ Har ${scoreMap[type].label}-schema`);
+      }
+    });
+  }
+
+  for (const match of matches) {
     try {
-      const jsonStr = match.replace(/<script[^>]*>|<\/script>/gi, '');
+      const jsonStr = match[1];
       const data = JSON.parse(jsonStr);
       const entries = Array.isArray(data) ? data : [data];
-
-      entries.forEach(entry => {
-        const type = entry["@type"];
-        if (type) {
-          types.push(type);
-
-          switch (type) {
-            case "Organization":
-              score += 1;
-              feedback.push("✅ Har Organization-schema");
-              break;
-            case "WebSite":
-              score += 1;
-              feedback.push("✅ Har WebSite-schema");
-              break;
-            case "LocalBusiness":
-              score += 2;
-              feedback.push("✅ Har LocalBusiness-schema");
-              break;
-            case "Product":
-            case "Offer":
-              score += 2;
-              feedback.push(`✅ Har ${type}-schema`);
-              break;
-            case "BreadcrumbList":
-              score += 1;
-              feedback.push("✅ Har BreadcrumbList-schema");
-              break;
-            default:
-              feedback.push(`ℹ️ Fundet schema-type: ${type}`);
-          }
-        }
-      });
-
+      entries.forEach(processEntry);
     } catch (err) {
-      console.warn('⚠️ Schema parsing-fejl:', err.message);
+      console.warn("⚠️ Schema parsing-fejl:", err.message);
     }
-  });
+  }
 
-  if (types.length === 0) {
-    feedback.push("❌ Ingen gyldige schema.org-typer fundet.");
+  if (types.size === 0) {
+    feedback.add("❌ Ingen gyldige schema.org-typer fundet.");
   }
 
   return {
-    hasSchema: types.length > 0,
-    schemaTypes: [...new Set(types)],
+    hasSchema: types.size > 0,
+    schemaTypes: [...types],
     schemaScore: score,
-    schemaFeedback: feedback
+    schemaFeedback: [...feedback]
   };
 }
+
 
 app.post('/crawl', async (req, res) => {
   console.log('🔎 RAW body modtaget:', req.body); // <-- Sæt denne som første linje i /crawl
