@@ -91,10 +91,11 @@ function extractCvrNumber(html) {
 
   // Prøv forskellige CVR-mønstre (mest specifikke først)
   const patterns = [
+    // "[CVR 35954716]" eller "(CVR 35954716)" – med eller uden mellemrum
+    /[\[\(]\s*CVR\s+(\d{8})\s*[\]\)]/i,
     // "CVR: 12345678" eller "CVR-nr: 12345678" eller "CVR nr. 12345678"
     /CVR[\s\-\.]*(nr|nummer|no)?[\s\-\.]*:?[\s]*(\d{8})/i,
-    // "[CVR 35954716]" eller "(CVR 35954716)"
-    /[\[\(]CVR[\s]+(\d{8})[\]\)]/i,
+    
     // "DK18966239" eller "DK 18966239" – dansk CVR-præfix
     /\bDK[\s]?(\d{8})\b/i,
     // "SE-nr: 12345678"
