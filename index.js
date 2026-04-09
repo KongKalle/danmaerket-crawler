@@ -93,12 +93,15 @@ function extractCvrNumber(html) {
   const patterns = [
     // "CVR: 12345678" eller "CVR-nr: 12345678" eller "CVR nr. 12345678"
     /CVR[\s\-\.]*(nr|nummer|no)?[\s\-\.]*:?[\s]*(\d{8})/i,
+    // "[CVR 35954716]" eller "(CVR 35954716)"
+    /[\[\(]CVR[\s]+(\d{8})[\]\)]/i,
+    // "DK18966239" eller "DK 18966239" – dansk CVR-præfix
+    /\bDK[\s]?(\d{8})\b/i,
     // "SE-nr: 12345678"
     /SE[\s\-\.]*(nr|nummer)?[\s\-\.]*:?[\s]*(\d{8})/i,
-    // "Org\.?nr:? 12345678"
+    // "Org.nr: 12345678"
     /[Oo]rg[\s\.]?nr[\s\.]*:?[\s]*(\d{8})/i,
-  ];
-
+];
   for (const pattern of patterns) {
     const match = plain.match(pattern);
     if (match) {
