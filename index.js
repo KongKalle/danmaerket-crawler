@@ -89,6 +89,8 @@ function extractCvrNumber(html) {
     .replace(/\s+/g, " ");
 
   const patterns = [
+     // "CVR 45 68 61 08" – cifre med mellemrum (2+2+2+2 eller 4+4)
+    /CVR[\s\-\.]*(nr|nummer|no)?[\s\-\.]*:?[\s]*(\d{2}[\s]\d{2}[\s]\d{2}[\s]\d{2}|\d{4}[\s]\d{4})/i,
     // "[CVR 35954716]" eller "(CVR 35954716)" – med eller uden mellemrum
     /[\[\(]\s*CVR\s+(\d{8})\s*[\]\)]/i,
     // "CVR: 12345678" eller "CVR-nr: 12345678" eller "CVR nr. 12345678"
@@ -104,12 +106,13 @@ function extractCvrNumber(html) {
   for (const pattern of patterns) {
     const match = plain.match(pattern);
     if (match) {
-      const num = match[2] || match[1];
-      if (num && /^\d{8}$/.test(num)) {
-        return num;
-      }
+        // Fjern mellemrum så "45 68 61 08" bliver "45686108"
+        const num = (match[2] || match[1] || "").replace(/\s/g, "");
+        if (num && /^\d{8}$/.test(num)) {
+            return num;
+        }
     }
-  }
+}
 
   return null;
 }
