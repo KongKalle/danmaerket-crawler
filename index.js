@@ -40,14 +40,11 @@ function checkSchemaMarkup(html) {
 
   function processEntry(entry) {
     if (!entry || typeof entry !== "object") return;
-
     if (Array.isArray(entry["@graph"])) {
       entry["@graph"].forEach(processEntry);
     }
-
     const rawType = entry["@type"];
     const entryTypes = Array.isArray(rawType) ? rawType : rawType ? [rawType] : [];
-
     entryTypes.forEach(type => {
       if (!type) return;
       types.add(type);
@@ -80,6 +77,43 @@ function checkSchemaMarkup(html) {
 }
 
 /** ---------------------------
+ *  CVR extractor (NY)
+ *  --------------------------- */
+function extractCvrNumber(html) {
+  if (!html) return null;
+
+  // Strip HTML tags for plain text søgning
+  const plain = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ");
+
+  // Prøv forskellige CVR-mønstre (mest specifikke først)
+  const patterns = [
+    // "CVR: 12345678" eller "CVR-nr: 12345678" eller "CVR nr. 12345678"
+    /CVR[\s\-\.]*(nr|nummer|no)?[\s\-\.]*:?[\s]*(\d{8})/i,
+    // "SE-nr: 12345678"
+    /SE[\s\-\.]*(nr|nummer)?[\s\-\.]*:?[\s]*(\d{8})/i,
+    // "Org\.?nr:? 12345678"
+    /[Oo]rg[\s\.]?nr[\s\.]*:?[\s]*(\d{8})/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = plain.match(pattern);
+    if (match) {
+      // Returnér den gruppe der indeholder de 8 cifre
+      const num = match[2] || match[1];
+      if (num && /^\d{8}$/.test(num)) {
+        return num;
+      }
+    }
+  }
+
+  return null;
+}
+
+/** ---------------------------
  *  Helpers
  *  --------------------------- */
 const UA =
@@ -87,16 +121,16 @@ const UA =
   "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
 
 function isProbablyThin(html) {
-  const plain = (html || "").replace(/<script[\s\S]*?<\/script>/gi, "")
-                            .replace(/<style[\s\S]*?<\/style>/gi, "")
-                            .replace(/<[^>]+>/g, " ")
-                            .replace(/\s+/g, " ")
-                            .trim();
+  const plain = (html || "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   return plain.length < 300;
 }
 
 async function fetchHtmlLight(url) {
-  // Node 18+ har global fetch. Hvis din runtime er ældre, så sig til.
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12000);
 
@@ -161,7 +195,6 @@ async function crawlWithPuppeteer(urls) {
   const browser = await getBrowser();
 
   let combined = "";
-  // Crawl SEKVENTIELT (concurrency=1) for at undgå fork/ressource-pres
   for (const url of urls) {
     const page = await browser.newPage();
     try {
@@ -170,7 +203,6 @@ async function crawlWithPuppeteer(urls) {
 
       page.on("request", (req) => {
         const type = req.resourceType();
-        // drop tunge ting
         if (["image", "media", "font"].includes(type)) return req.abort();
         return req.continue();
       });
@@ -204,7 +236,7 @@ app.post("/crawl", async (req, res) => {
     return res.status(400).json({ error: "Ingen URL-liste modtaget." });
   }
 
-  // 1) Light crawl først (billigt + virker når puppeteer fejler)
+  // 1) Light crawl først
   const lightParts = [];
   let lightHadHardFail = false;
 
@@ -223,8 +255,7 @@ app.post("/crawl", async (req, res) => {
 
   let combinedHtml = lightParts.join("");
 
-  // 2) Hvis light er tyndt, så prøv puppeteer (hvis muligt)
-  //    Hvis puppeteer fejler, returnér stadig light-resultat + et hint
+  // 2) Puppeteer fallback hvis light er tyndt
   const needPuppeteer = !combinedHtml.trim() || isProbablyThin(combinedHtml) || lightHadHardFail;
 
   if (needPuppeteer) {
@@ -232,18 +263,19 @@ app.post("/crawl", async (req, res) => {
       console.log("🧠 Light crawl er tyndt/fejlede → prøver puppeteer...");
       const pupHtml = await crawlWithPuppeteer(urls);
 
-      // Brug puppeteer-resultat hvis det giver mere
       if (pupHtml && pupHtml.length > combinedHtml.length) {
         combinedHtml = pupHtml;
       }
     } catch (err) {
       console.error("❌ Puppeteer fejlede:", err.message);
 
-      // Hvis vi har noget light HTML, så returnér det (ikke 500)
       if (combinedHtml && combinedHtml.trim().length > 200) {
         const schemaInfo = checkSchemaMarkup(combinedHtml);
+        const cvrNummer = extractCvrNumber(combinedHtml);
+
         return res.json({
           html: combinedHtml,
+          cvr_nummer: cvrNummer,
           hasSchema: schemaInfo.hasSchema,
           schemaTypes: schemaInfo.schemaTypes,
           schemaScore: schemaInfo.schemaScore,
@@ -252,7 +284,6 @@ app.post("/crawl", async (req, res) => {
         });
       }
 
-      // Hvis vi intet har, så returnér en klar fejl
       return res.status(503).json({
         error: "Crawleren kunne ikke starte browseren (ressource-limit). Prøv igen senere.",
         error_code: "PUPPETEER_LAUNCH_FAILED"
@@ -266,9 +297,13 @@ app.post("/crawl", async (req, res) => {
   }
 
   const schemaInfo = checkSchemaMarkup(combinedHtml);
+  const cvrNummer = extractCvrNumber(combinedHtml);
+
+  console.log("🔍 CVR fundet:", cvrNummer ?? "ingen");
 
   return res.json({
     html: combinedHtml,
+    cvr_nummer: cvrNummer,
     hasSchema: schemaInfo.hasSchema,
     schemaTypes: schemaInfo.schemaTypes,
     schemaScore: schemaInfo.schemaScore,
