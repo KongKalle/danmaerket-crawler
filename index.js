@@ -10,7 +10,7 @@ app.get("/", (req, res) => res.status(200).send("OK"));
 app.get("/health", (req, res) => res.status(200).json({ status: "ok" }));
 
 /** ---------------------------
- *  Schema checker (uændret)
+ *  Schema checker
  *  --------------------------- */
 function checkSchemaMarkup(html) {
   const schemaRegex = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
@@ -77,36 +77,33 @@ function checkSchemaMarkup(html) {
 }
 
 /** ---------------------------
- *  CVR extractor (NY)
+ *  CVR extractor
  *  --------------------------- */
 function extractCvrNumber(html) {
   if (!html) return null;
 
-  // Strip HTML tags for plain text søgning
   const plain = html
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
     .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ");
 
-  // Prøv forskellige CVR-mønstre (mest specifikke først)
   const patterns = [
     // "[CVR 35954716]" eller "(CVR 35954716)" – med eller uden mellemrum
     /[\[\(]\s*CVR\s+(\d{8})\s*[\]\)]/i,
     // "CVR: 12345678" eller "CVR-nr: 12345678" eller "CVR nr. 12345678"
     /CVR[\s\-\.]*(nr|nummer|no)?[\s\-\.]*:?[\s]*(\d{8})/i,
-    
-    // "DK18966239" eller "DK 18966239" – dansk CVR-præfix
+    // "DK18966239" eller "DK 18966239"
     /\bDK[\s]?(\d{8})\b/i,
     // "SE-nr: 12345678"
     /SE[\s\-\.]*(nr|nummer)?[\s\-\.]*:?[\s]*(\d{8})/i,
     // "Org.nr: 12345678"
     /[Oo]rg[\s\.]?nr[\s\.]*:?[\s]*(\d{8})/i,
-];
+  ];
+
   for (const pattern of patterns) {
     const match = plain.match(pattern);
     if (match) {
-      // Returnér den gruppe der indeholder de 8 cifre
       const num = match[2] || match[1];
       if (num && /^\d{8}$/.test(num)) {
         return num;
@@ -150,12 +147,10 @@ async function fetchHtmlLight(url) {
       signal: controller.signal
     });
 
-    const ct = resp.headers.get("content-type") || "";
     const text = await resp.text();
-
-    return { ok: resp.ok, status: resp.status, contentType: ct, html: text || "" };
+    return { ok: resp.ok, status: resp.status, html: text || "" };
   } catch (e) {
-    return { ok: false, status: 0, contentType: "", html: "", error: e.message };
+    return { ok: false, status: 0, html: "", error: e.message };
   } finally {
     clearTimeout(timeout);
   }
@@ -197,8 +192,8 @@ async function safeCloseBrowser() {
 
 async function crawlWithPuppeteer(urls) {
   const browser = await getBrowser();
-
   let combined = "";
+
   for (const url of urls) {
     const page = await browser.newPage();
     try {
@@ -229,6 +224,30 @@ async function crawlWithPuppeteer(urls) {
 }
 
 /** ---------------------------
+ *  Byg liste af undersider
+ *  --------------------------- */
+function buildUrlList(baseUrl) {
+  const base = baseUrl.replace(/\/$/, "");
+
+  const subpages = [
+    "",
+    "/handelsbetingelser",
+    "/betingelser",
+    "/vilkaar",
+    "/vilkaar-og-betingelser",
+    "/kontakt",
+    "/kontakt-os",
+    "/om-os",
+    "/om",
+    "/privatlivspolitik",
+    "/persondatapolitik",
+    "/cookie-politik",
+  ];
+
+  return subpages.map(path => base + path);
+}
+
+/** ---------------------------
  *  Route: /crawl
  *  --------------------------- */
 app.post("/crawl", async (req, res) => {
@@ -240,32 +259,47 @@ app.post("/crawl", async (req, res) => {
     return res.status(400).json({ error: "Ingen URL-liste modtaget." });
   }
 
-  // 1) Light crawl først
-  const lightParts = [];
+  // Byg komplet URL-liste inkl. undersider
+  const allUrls = buildUrlList(urls[0]);
+  console.log(`🗺️ Crawler ${allUrls.length} sider for ${urls[0]}`);
+
+  // --- 1) Light crawl af alle sider ---
+  let combinedHtml = "";
   let lightHadHardFail = false;
 
-  for (const url of urls) {
+  for (const url of allUrls) {
     console.log("🌐 (light) Læser:", url);
     const r = await fetchHtmlLight(url);
 
-    if (!r.ok) lightHadHardFail = true;
+    // Spring 404-sider over
+    if (r.status === 404) {
+      console.log(`⏭️ 404 – springer over: ${url}`);
+      continue;
+    }
+
+    // Registrer hvis forsiden fejler
+    if (url === allUrls[0] && !r.ok) lightHadHardFail = true;
 
     if (r.html && r.html.length) {
-      lightParts.push(`\n<!-- START: ${url} -->\n${r.html}\n<!-- END: ${url} -->\n`);
-    } else {
-      lightParts.push("");
+      combinedHtml += `\n<!-- START: ${url} -->\n${r.html}\n<!-- END: ${url} -->\n`;
+
+      // Tidlig exit: CVR fundet – ingen grund til at crawle videre
+      const cvrFound = extractCvrNumber(r.html);
+      if (cvrFound) {
+        console.log(`✅ CVR fundet på ${url}: ${cvrFound} – stopper tidligt`);
+        break;
+      }
     }
   }
 
-  let combinedHtml = lightParts.join("");
-
-  // 2) Puppeteer fallback hvis light er tyndt
-  const needPuppeteer = !combinedHtml.trim() || isProbablyThin(combinedHtml) || lightHadHardFail;
+  // --- 2) Puppeteer fallback hvis forside er tyndt/fejlet ---
+  const needPuppeteer = isProbablyThin(combinedHtml) || lightHadHardFail;
 
   if (needPuppeteer) {
     try {
-      console.log("🧠 Light crawl er tyndt/fejlede → prøver puppeteer...");
-      const pupHtml = await crawlWithPuppeteer(urls);
+      console.log("🧠 Light crawl er tyndt/fejlede → prøver puppeteer på forside...");
+      // Kun forsiden via puppeteer – ikke alle undersider (for ressourcekrævende)
+      const pupHtml = await crawlWithPuppeteer([urls[0]]);
 
       if (pupHtml && pupHtml.length > combinedHtml.length) {
         combinedHtml = pupHtml;
@@ -284,18 +318,18 @@ app.post("/crawl", async (req, res) => {
           schemaTypes: schemaInfo.schemaTypes,
           schemaScore: schemaInfo.schemaScore,
           schemaFeedback: schemaInfo.schemaFeedback,
-          note: "Puppeteer kunne ikke starte (ressource-limit). Returnerer light crawl."
+          note: "Puppeteer kunne ikke starte. Returnerer light crawl."
         });
       }
 
       return res.status(503).json({
-        error: "Crawleren kunne ikke starte browseren (ressource-limit). Prøv igen senere.",
+        error: "Crawleren kunne ikke starte browseren. Prøv igen senere.",
         error_code: "PUPPETEER_LAUNCH_FAILED"
       });
     }
   }
 
-  // 3) Slutresultat
+  // --- 3) Slutresultat ---
   if (!combinedHtml || combinedHtml.trim().length < 100) {
     return res.status(500).json({ error: "Ingen brugbar HTML fundet." });
   }
