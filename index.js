@@ -233,11 +233,14 @@ function buildUrlList(baseUrl) {
   const base = baseUrl.replace(/\/$/, "");
 
   const subpages = [
+    // Forside
     "",
+    // Standard dansk
     "/handelsbetingelser",
     "/betingelser",
     "/vilkaar",
     "/vilkaar-og-betingelser",
+    "/salgs-og-leveringsbetingelser",
     "/kontakt",
     "/kontakt-os",
     "/om-os",
@@ -245,6 +248,18 @@ function buildUrlList(baseUrl) {
     "/privatlivspolitik",
     "/persondatapolitik",
     "/cookie-politik",
+    "/retur",
+    "/returpolitik",
+    // Shopify /pages/ struktur
+    "/pages/handelsbetingelser",
+    "/pages/betingelser",
+    "/pages/vilkaar",
+    "/pages/salgs-og-leveringsbetingelser",
+    "/pages/kontakt",
+    "/pages/om-os",
+    "/pages/privatlivspolitik",
+    "/pages/retur",
+    "/pages/returpolitik",
   ];
 
   return subpages.map(path => base + path);
